@@ -1,9 +1,16 @@
+import matplotlib
 import mlflow
 import os
 import pandas as pd
 from loader import get_train_test_split_data
 import logging
 import warnings
+
+# --- Plotting ---
+# Draw plots into files only, never into a window.
+# mlflow.models.evaluate saves plots (e.g. the confusion matrix) as artifacts,
+# so no graphical display is needed.
+matplotlib.use("Agg")
 
 # --- Setup Logging ---
 logging.getLogger("mlflow").setLevel(logging.ERROR)
@@ -19,7 +26,13 @@ def get_latest_run_id():
     try:
         # Insert your code here
         # Search for the latest run in the experiment
-       
+        # order_by=["start_time DESC"] sorts the runs by start time in descending order
+        # max_results=1 returns only the latest run
+        last_run = mlflow.search_runs(
+            experiment_names=[EXPERIMENT_NAME],
+            order_by=["start_time DESC"],
+            max_results=1
+        )
         if not last_run.empty:
             return last_run.iloc[0].run_id
     except Exception:
@@ -49,8 +62,24 @@ def evaluate():
     
     print(f"Evaluating model: {model_uri}")
 
-    # Insert your code here
-    # Ensure we log to the same experiment as training
+    # Ensure that we log to the sme experiment as in training
+    mlflow.set_experiment(EXPERIMENT_NAME)
+
+    with mlflow.start_run(run_name="Model_Evaluation"):
+        # Use mlflow.models.evaluate
+        result = mlflow.models.evaluate(
+            model=model_uri,
+            data=eval_data,
+            targets="Churn",
+            model_type="classifier",
+            evaluators=["default"],
+        )
+
+        print("\nEvaluation metrics logged to MLflow:")
+        # Print a clean subset of metrics
+        metrics_to_show = ["accuracy_score", "f1_score", "roc_auc"]
+        clean_metrics = {k: v for k, v in result.metrics.items() if k in metrics_to_show}
+        print(clean_metrics)
 
 
 if __name__ == "__main__":

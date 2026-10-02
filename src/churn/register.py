@@ -47,21 +47,31 @@ def register(run_id=None):
     else:
         model_uri = f"runs:/{run_id}/model"
 
-    # Insert your code here
+    # Initialize client and register model
+    client = MlflowClient()
 
     # Check if model already exists, if not create it
     try:
-        # Insert your code here
+        client.get_registered_model(MODEL_NAME)
     except Exception:
         print(f"Creating registered model '{MODEL_NAME}'...")
-        # Insert your code here
+        client.create_registered_model(MODEL_NAME)
+
+    model_details = client.create_model_version(
+        name=MODEL_NAME,
+        source=model_uri,
+        run_id=run_id,
+    )
     
     print(f"Model registered. Version: {model_details.version}")
     # 2. Transition to Staging
-    # Insert your code here
-    
     print(f"Transitioning version {model_details.version} to Staging...")
-    # Insert your code here
+    
+    client.transition_model_version_stage(
+            name=MODEL_NAME,
+            version=model_details.version,
+            stage="Staging",
+        )    
     
     print("Transition complete.")
 

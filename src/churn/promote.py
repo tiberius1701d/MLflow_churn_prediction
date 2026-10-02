@@ -38,8 +38,12 @@ def get_staging_model_version(client):
 def get_evaluation_metrics(run_id):
     """Retrieve F1 score from the evaluation run associated with a model."""
     # Search for evaluation runs that evaluated this model
-    # Insert your code here
-    
+    eval_runs = mlflow.search_runs(
+        experiment_names=[EXPERIMENT_NAME],
+        filter_string=f"tags.mlflow.runName = 'Model_Evaluation'",
+        order_by=["start_time DESC"],
+        max_results=1
+    )
     
     f1 = eval_runs.iloc[0].get("metrics.f1_score")
     accuracy = eval_runs.iloc[0].get("metrics.accuracy_score")
@@ -58,11 +62,12 @@ def get_git_sha():
         return "unknown"
 
 
-def promote():
-    # Insert your code here
-    
+def promote():   
+
+    client = MlflowClient()
 
     # 1. Find the model in Staging
+    staging_version = get_staging_model_version(client)
     
     if not staging_version:
         print("No model version found in 'Staging'. Run the pipeline first.")
@@ -72,6 +77,7 @@ def promote():
     print(f"  Source Run: {staging_version.run_id}")
 
     # 2. Check evaluation metrics
+    metrics = get_evaluation_metrics(staging_version.run_id)
     
     if metrics is None:
         print("No evaluation metrics found. Run evaluate.py first.")
@@ -93,8 +99,13 @@ def promote():
         client.set_model_version_tag(MODEL_NAME, staging_version.version, "promoted_by", "promote.py")
         client.set_model_version_tag(MODEL_NAME, staging_version.version, "f1_at_promotion", str(round(f1, 4)))
 
-        # Insert your code here
         # Transition to Production
+        client.transition_model_version_stage(
+            name=MODEL_NAME,
+            version=staging_version.version,
+            stage="Production",
+            archive_existing_versions=True  # Archive any existing Production versions
+        )
         
         print(f"Model version {staging_version.version} is now in Production!")
     else:
